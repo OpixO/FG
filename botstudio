@@ -1,0 +1,23 @@
+const Discord = require('discord.js');
+const client = new Discord.Client();
+
+client.on('ready', () => {
+  console.log('I am ready!');
+});
+
+client.on('guildMemberAdd', member => {
+    member.send('Reponds ok si tu as tout lu !').catch(console.log)
+})
+
+client.on('message', message => {
+  if (message.content === 'ok' && message.channel.type === 'dm') {
+    if(client.guilds.get("Membre").members.has(message.author.id)) {
+      var member = client.guilds.get("Membre").members.get(message.author.id)
+      if(!member.roles.has("Membre")) {
+        member.addRole("Membre").catch(console.log)
+      }
+    }
+  }
+});
+
+client.login('MzY5NzU1NTY5ODc3MTU1ODQw.DMe1yg.9u8ZQeT9OJiiClHoujjQrlATl0g');
