@@ -57,6 +57,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
         val context = applicationContext
         val views = RemoteViews(context.packageName, R.layout.widget)
         BoubouWidget.configureRefresh(context, views)
+        try { BoubouPhoto.bitmap()?.let { views.setImageViewBitmap(R.id.plant, it) } } catch (_: Exception) {}
         try {
             val endpoint = URL("https://api.open-meteo.com/v1/forecast?latitude=43.667&longitude=4.032&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,wind_gusts_10m&timezone=Europe%2FParis&forecast_days=5")
             val connection = (endpoint.openConnection() as HttpURLConnection).apply { connectTimeout = 12000; readTimeout = 12000 }
