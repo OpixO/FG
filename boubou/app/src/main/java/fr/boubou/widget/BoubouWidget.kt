@@ -173,8 +173,8 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.weather, "Vent ${format(maxWind)} · Rafales ${format(maxGust)} km/h · Pluie ${format(maxRain)} %")
             listOf(R.id.night0, R.id.night1, R.id.night2, R.id.night3, R.id.night4).forEachIndexed { index, id ->
                 val min = perNight[index].minOrNull()
-                val label = listOf("Ce soir", "Demain", "J+2", "J+3", "J+4")[index]
-                views.setTextViewText(id, "$label ${min?.let { format(it) + "°" } ?: "—"}")
+                val label = nightStart.plusDays(index.toLong()).dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.FRANCE).replaceFirstChar { it.uppercase() }
+                views.setTextViewText(id, "$label\n${min?.let { format(it) + "°" } ?: "—"}")
                 views.setTextColor(id, if (min == null) Color.WHITE else if (min <= 5) Color.rgb(255,117,130) else if (min < 8) Color.rgb(255,205,114) else Color.WHITE)
             }
             views.setInt(R.id.status, "setBackgroundColor", color)
@@ -186,11 +186,11 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.temperature, "— °C")
             views.setTextViewText(R.id.current, "Actuellement —")
             views.setTextViewText(R.id.advice, "Données indisponibles · touche pour réessayer")
-            views.setTextViewText(R.id.night0, "Ce soir —")
-            views.setTextViewText(R.id.night1, "Demain —")
-            views.setTextViewText(R.id.night2, "J+2 —")
-            views.setTextViewText(R.id.night3, "J+3 —")
-            views.setTextViewText(R.id.night4, "J+4 —")
+            views.setTextViewText(R.id.night0, "—\n—")
+            views.setTextViewText(R.id.night1, "—\n—")
+            views.setTextViewText(R.id.night2, "—\n—")
+            views.setTextViewText(R.id.night3, "—\n—")
+            views.setTextViewText(R.id.night4, "—\n—")
             views.setTextViewText(R.id.weather, "Météo indisponible")
             views.setTextViewText(R.id.updated, "Hors ligne")
         }
