@@ -74,7 +74,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             val now = LocalDateTime.now(ZoneId.of("Europe/Paris"))
             val nightStart = if (now.hour < 9) now.toLocalDate().minusDays(1).atTime(18, 0) else now.toLocalDate().atTime(18, 0)
             val nightEnd = nightStart.plusHours(15)
-            val horizon = now.plusHours(72)
+            val horizon = nightStart.plusDays(5).plusHours(15)
             val tonight = mutableListOf<Double>()
             val nights = mutableListOf<Double>()
             val perNight = Array(5) { mutableListOf<Double>() }
@@ -126,13 +126,15 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 "  • Vent max : " + format(maxWind) + " km/h  • Rafales : " + format(maxGust) +
                 " km/h  • Probabilité de pluie max : " + format(maxRain) + " %"
             val previousStatus = prefs.getString("last_status", "")
+            val previousWarning = prefs.getBoolean("last_warning", false)
             val shouldWarn = low <= 5 || low5 <= 5 || maxGust >= 65
             prefs.edit().putLong("updated", System.currentTimeMillis())
                 .putString("summary", status + " · " + format(low) + " °C cette nuit")
                 .putString("forecast", forecasts)
                 .putString("conditions", conditions)
-                .putString("last_status", status).apply()
-            if (shouldWarn && previousStatus != status) {
+                .putString("last_status", status)
+                .putBoolean("last_warning", shouldWarn).apply()
+            if (shouldWarn && (!previousWarning || previousStatus != status)) {
                 val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val channel = "boubou_froid"
                 if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(NotificationChannel(channel, "Alertes Boubou", NotificationManager.IMPORTANCE_HIGH))
