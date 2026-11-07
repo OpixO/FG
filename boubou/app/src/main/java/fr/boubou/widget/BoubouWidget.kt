@@ -45,8 +45,8 @@ class BoubouWidget : AppWidgetProvider() {
     companion object {
         const val ACTION_REFRESH = "fr.boubou.widget.REFRESH"
         fun configureRefresh(context: Context, views: RemoteViews) {
-            val intent = Intent(context, DashboardActivity::class.java)
-            val pending = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val intent = Intent(context, BoubouWidget::class.java).setAction(ACTION_REFRESH)
+            val pending = PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             views.setOnClickPendingIntent(R.id.root, pending)
         }
     }
@@ -75,6 +75,8 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             val nightStart = if (now.hour < 9) now.toLocalDate().minusDays(1).atTime(18, 0) else now.toLocalDate().atTime(18, 0)
             val nightEnd = nightStart.plusHours(15)
             val horizon = nightStart.plusDays(5).plusHours(15)
+            var currentTemp: Double? = null
+            var nextCold: LocalDateTime? = null
             val tonight = mutableListOf<Double>()
             val nights = mutableListOf<Double>()
             val perNight = Array(5) { mutableListOf<Double>() }
@@ -85,8 +87,10 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             for (index in 0 until times.length()) {
                 if (temps.isNull(index)) continue
                 val hour = LocalDateTime.parse(times.getString(index))
+                if (currentTemp == null && !hour.isBefore(now)) currentTemp = temps.getDouble(index)
                 if (hour.isBefore(now) || !hour.isBefore(horizon)) continue
                 val temp = temps.getDouble(index)
+                if (nextCold == null && temp <= 5) nextCold = hour
                 if (!hour.isBefore(nightStart) && hour.isBefore(nightEnd)) tonight += temp
                 if (hour.hour >= 18 || hour.hour < 9) {
                     nights += temp
@@ -106,7 +110,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             val low72 = perNight.take(3).flatMap { it }.minOrNull() ?: low
             val low5 = perNight.flatMap { it }.minOrNull() ?: low
             val status = when {
-                low <= 5 -> "🏠 RENTRE BOUBOU"
+                low <= 5 -> "🏠 RENTRE BOUBOU CE SOIR"
                 low < 8 -> "⚠️ NUIT FRAÎCHE"
                 low5 <= 5 -> "⚠️ FROID À VENIR"
                 low5 < 8 -> "🌙 SURVEILLE BOUBOU"
@@ -145,6 +149,24 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 val old = prefs.getString("history", "") ?: ""
                 prefs.edit().putString("history", "• " + java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM HH:mm")) + " — " + message + "\\n" + old.take(1800)).apply()
             }
+            val hoursToCold = nextCold?.let { java.time.Duration.between(now, it).toHours().coerceAtLeast(0) }
+            val advice = when {
+                low <= 5 -> "Froid cette nuit : rentre Boubou avant le soir"
+                low5 <= 5 -> "Froid dans " + (hoursToCold?.toString() ?: "?") + " h : prépare sa protection"
+                maxGust >= 65 -> "Rafales fortes : place le pot à l'abri"
+                low < 8 -> "Nuit fraîche : surveille l'exposition"
+                else -> "Conditions favorables : Boubou peut rester dehors"
+            }
+            views.setTextViewText(R.id.advice, advice)
+            views.setTextViewText(R.id.current, "Actuellement " + (currentTemp?.let { format(it) + " °C" } ?: "—"))
+            val hourNow = now.hour
+            val background = when {
+                low <= 5 -> Color.rgb(92, 29, 47)
+                low5 <= 5 || low < 8 -> Color.rgb(61, 39, 93)
+                hourNow < 7 || hourNow >= 19 -> Color.rgb(12, 25, 47)
+                else -> Color.rgb(24, 56, 78)
+            }
+            views.setInt(R.id.root, "setBackgroundColor", background)
             views.setTextViewText(R.id.status, status)
             views.setTextViewText(R.id.temperature, "${format(low)} °C")
             views.setTextViewText(R.id.weather, "Vent ${format(maxWind)} · Rafales ${format(maxGust)} km/h · Pluie ${format(maxRain)} %")
@@ -154,12 +176,15 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 views.setTextViewText(id, "$label ${min?.let { format(it) + "°" } ?: "—"}")
                 views.setTextColor(id, if (min == null) Color.WHITE else if (min <= 5) Color.rgb(255,117,130) else if (min < 8) Color.rgb(255,205,114) else Color.WHITE)
             }
-            views.setTextColor(R.id.status, if (color == Color.rgb(31,140,93)) Color.rgb(132,226,176) else if (color == Color.rgb(203,117,28)) Color.rgb(255,205,114) else Color.rgb(255,117,130))
+            views.setInt(R.id.status, "setBackgroundColor", color)
+            views.setTextColor(R.id.status, Color.WHITE)
             views.setTextViewText(R.id.updated, "↻ " + java.time.ZonedDateTime.now(ZoneId.of("Europe/Paris")).format(DateTimeFormatter.ofPattern("HH:mm")))
         } catch (exception: Exception) {
             views.setTextViewText(R.id.status, "⚠️ MÉTÉO INDISPONIBLE")
             views.setTextColor(R.id.status, Color.rgb(255,205,114))
             views.setTextViewText(R.id.temperature, "— °C")
+            views.setTextViewText(R.id.current, "Actuellement —")
+            views.setTextViewText(R.id.advice, "Données indisponibles · touche pour réessayer")
             views.setTextViewText(R.id.night0, "Ce soir —")
             views.setTextViewText(R.id.night1, "Demain —")
             views.setTextViewText(R.id.night2, "J+2 —")
