@@ -147,9 +147,10 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             }
             views.setTextViewText(R.id.status, status)
             views.setTextViewText(R.id.temperature, "${format(low)} °C")
-            listOf(R.id.night0, R.id.night1, R.id.night2).forEachIndexed { index, id ->
+            views.setTextViewText(R.id.weather, "Vent ${format(maxWind)} · Rafales ${format(maxGust)} km/h · Pluie ${format(maxRain)} %")
+            listOf(R.id.night0, R.id.night1, R.id.night2, R.id.night3, R.id.night4).forEachIndexed { index, id ->
                 val min = perNight[index].minOrNull()
-                val label = listOf("Ce soir", "Demain", "J+2")[index]
+                val label = listOf("Ce soir", "Demain", "J+2", "J+3", "J+4")[index]
                 views.setTextViewText(id, "$label ${min?.let { format(it) + "°" } ?: "—"}")
                 views.setTextColor(id, if (min == null) Color.WHITE else if (min <= 5) Color.rgb(255,117,130) else if (min < 8) Color.rgb(255,205,114) else Color.WHITE)
             }
@@ -162,6 +163,9 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.night0, "Ce soir —")
             views.setTextViewText(R.id.night1, "Demain —")
             views.setTextViewText(R.id.night2, "J+2 —")
+            views.setTextViewText(R.id.night3, "J+3 —")
+            views.setTextViewText(R.id.night4, "J+4 —")
+            views.setTextViewText(R.id.weather, "Météo indisponible")
             views.setTextViewText(R.id.updated, "Hors ligne")
         }
         AppWidgetManager.getInstance(context).updateAppWidget(ComponentName(context, BoubouWidget::class.java), views)
