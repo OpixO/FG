@@ -69,13 +69,19 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             val horizon = now.plusHours(72)
             val tonight = mutableListOf<Double>()
             val nights = mutableListOf<Double>()
+            val perNight = Array(3) { mutableListOf<Double>() }
             for (index in 0 until times.length()) {
                 if (temps.isNull(index)) continue
                 val hour = LocalDateTime.parse(times.getString(index))
                 if (hour.isBefore(now) || !hour.isBefore(horizon)) continue
                 val temp = temps.getDouble(index)
                 if (!hour.isBefore(nightStart) && hour.isBefore(nightEnd)) tonight += temp
-                if (hour.hour >= 18 || hour.hour < 9) nights += temp
+                if (hour.hour >= 18 || hour.hour < 9) {
+                    nights += temp
+                    val date = if (hour.hour < 9) hour.toLocalDate().minusDays(1) else hour.toLocalDate()
+                    val indexNight = java.time.temporal.ChronoUnit.DAYS.between(nightStart.toLocalDate(), date).toInt()
+                    if (indexNight in 0..2) perNight[indexNight] += temp
+                }
             }
             if (tonight.isEmpty() || nights.isEmpty()) error("No night forecast")
             val low = tonight.minOrNull()!!
@@ -93,13 +99,22 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 else -> Color.rgb(31,140,93)
             }
             views.setTextViewText(R.id.status, status)
-            views.setColorStateList(R.id.status, "setBackgroundTintList", ColorStateList.valueOf(color))
-            views.setTextViewText(R.id.details, "🌙 Cette nuit ${format(low)} °C   •   72 h ${format(low72)} °C")
+            views.setTextViewText(R.id.temperature, "${format(low)} °C")
+            listOf(R.id.night0, R.id.night1, R.id.night2).forEachIndexed { index, id ->
+                val min = perNight[index].minOrNull()
+                val label = listOf("Ce soir", "Demain", "J+2")[index]
+                views.setTextViewText(id, "$label ${min?.let { format(it) + "°" } ?: "—"}")
+                views.setTextColor(id, if (min == null) Color.WHITE else if (min <= 5) Color.rgb(255,117,130) else if (min < 8) Color.rgb(255,205,114) else Color.WHITE)
+            }
+            views.setTextColor(R.id.status, if (color == Color.rgb(31,140,93)) Color.rgb(132,226,176) else if (color == Color.rgb(203,117,28)) Color.rgb(255,205,114) else Color.rgb(255,117,130))
             views.setTextViewText(R.id.updated, "↻ " + java.time.ZonedDateTime.now(ZoneId.of("Europe/Paris")).format(DateTimeFormatter.ofPattern("HH:mm")))
         } catch (exception: Exception) {
             views.setTextViewText(R.id.status, "⚠️ MÉTÉO INDISPONIBLE")
-            views.setColorStateList(R.id.status, "setBackgroundTintList", ColorStateList.valueOf(Color.rgb(177,93,37)))
-            views.setTextViewText(R.id.details, "Impossible de vérifier • touche pour réessayer")
+            views.setTextColor(R.id.status, Color.rgb(255,205,114))
+            views.setTextViewText(R.id.temperature, "— °C")
+            views.setTextViewText(R.id.night0, "Ce soir —")
+            views.setTextViewText(R.id.night1, "Demain —")
+            views.setTextViewText(R.id.night2, "J+2 —")
             views.setTextViewText(R.id.updated, "Hors ligne")
         }
         AppWidgetManager.getInstance(context).updateAppWidget(ComponentName(context, BoubouWidget::class.java), views)
