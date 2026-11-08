@@ -20,6 +20,21 @@
   </LinearLayout>
  </LinearLayout>
  <TextView android:id="@+id/advice" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingBottom="4dp" android:text="Analyse météo…" android:textColor="#E2EAF3" android:textSize="10sp" android:singleLine="true" android:ellipsize="end"/>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="3dp"><TextView android:id="@+id/timeline_label" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="PROCHAINES 24 H · Analyse en cours" android:textColor="#D6E7F5" android:textSize="9sp" android:singleLine="true"/></LinearLayout>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="9dp" android:orientation="horizontal" android:weightSum="12">
+  <TextView android:id="@+id/hour0" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour1" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour2" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour3" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour4" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour5" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour6" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour7" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour8" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour9" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour10" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+  <TextView android:id="@+id/hour11" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="2dp" android:background="#64748B"/>
+ </LinearLayout>
  <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="5">
   <TextView android:id="@+id/night0" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/night_bg" android:gravity="center" android:paddingVertical="7dp" android:text="Sam\n—°" android:textColor="#FFFFFF" android:textSize="11sp" android:maxLines="2"/>
   <TextView android:id="@+id/night1" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:background="@drawable/night_bg" android:gravity="center" android:paddingVertical="7dp" android:text="Dim\n—°" android:textColor="#FFFFFF" android:textSize="11sp" android:maxLines="2"/>
