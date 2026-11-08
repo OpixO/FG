@@ -87,6 +87,9 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             var maxRain = 0.0
             var rain24 = 0.0
             var rainProb24 = 0.0
+            var maxGust24 = 0.0
+            var maxTemp24 = Double.NEGATIVE_INFINITY
+            var minTemp24 = Double.POSITIVE_INFINITY
             var minFeels = Double.POSITIVE_INFINITY
             for (index in 0 until times.length()) {
                 if (temps.isNull(index)) continue
@@ -95,6 +98,8 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 if (!hour.isBefore(now) && hour.isBefore(now.plusHours(24))) {
                     if (!precipitation.isNull(index)) rain24 += precipitation.getDouble(index)
                     if (!rain.isNull(index)) rainProb24 = maxOf(rainProb24, rain.getDouble(index))
+                    if (!gusts.isNull(index)) maxGust24 = maxOf(maxGust24, gusts.getDouble(index))
+                    if (!temps.isNull(index)) { maxTemp24 = maxOf(maxTemp24, temps.getDouble(index)); minTemp24 = minOf(minTemp24, temps.getDouble(index)) }
                 }
                 if (hour.isBefore(now) || !hour.isBefore(horizon)) continue
                 val temp = temps.getDouble(index)
@@ -167,11 +172,13 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             }
             // Two-hour blocks, each colored for the worst condition in that interval.
             val risk = IntArray(12)
+            val hourlyTemps = arrayOfNulls<Double>(12)
             for (i in 0 until times.length()) {
                 val hour = LocalDateTime.parse(times.getString(i))
                 val slot = (java.time.Duration.between(now, hour).toMinutes() / 120).toInt()
                 if (hour.isBefore(now) || slot !in 0..11 || temps.isNull(i)) continue
                 val t = temps.getDouble(i)
+                if (hourlyTemps[slot] == null) hourlyTemps[slot] = t
                 val g = if (gusts.isNull(i)) 0.0 else gusts.getDouble(i)
                 val mm = if (precipitation.isNull(i)) 0.0 else precipitation.getDouble(i)
                 val probability = if (rain.isNull(i)) 0.0 else rain.getDouble(i)
@@ -184,6 +191,11 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             }
             val riskIds = intArrayOf(R.id.hour0, R.id.hour1, R.id.hour2, R.id.hour3, R.id.hour4, R.id.hour5, R.id.hour6, R.id.hour7, R.id.hour8, R.id.hour9, R.id.hour10, R.id.hour11)
             riskIds.forEachIndexed { index, id ->
+                val hour = now.plusHours((index * 2).toLong())
+                val hourLabelIds = intArrayOf(R.id.hourLabel0, R.id.hourLabel1, R.id.hourLabel2, R.id.hourLabel3, R.id.hourLabel4, R.id.hourLabel5, R.id.hourLabel6, R.id.hourLabel7, R.id.hourLabel8, R.id.hourLabel9, R.id.hourLabel10, R.id.hourLabel11)
+                val hourTempIds = intArrayOf(R.id.hourTemp0, R.id.hourTemp1, R.id.hourTemp2, R.id.hourTemp3, R.id.hourTemp4, R.id.hourTemp5, R.id.hourTemp6, R.id.hourTemp7, R.id.hourTemp8, R.id.hourTemp9, R.id.hourTemp10, R.id.hourTemp11)
+                views.setTextViewText(hourLabelIds[index], if (index == 0) "Mnt" else hour.format(DateTimeFormatter.ofPattern("HH")) + "h")
+                views.setTextViewText(hourTempIds[index], hourlyTemps[index]?.let { format(it) + "°" } ?: "—")
                 views.setInt(id, "setBackgroundColor", when(risk[index]) {
                     2 -> Color.rgb(226, 74, 88)
                     1 -> Color.rgb(244, 170, 67)
@@ -207,10 +219,12 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 hourNow < 7 || hourNow >= 19 -> Color.rgb(12, 25, 47)
                 else -> Color.rgb(24, 56, 78)
             }
-            views.setInt(R.id.root, "setBackgroundColor", background)
+            // Keep the rounded premium gradient background instead of overriding it.
             views.setTextViewText(R.id.status, status)
             views.setTextViewText(R.id.temperature, "${format(low)} °C")
-            views.setTextViewText(R.id.rain_detail, "🌧 Pluie 24 h : ${format(rain24)} mm · Risque max ${format(rainProb24)} %")
+            views.setTextViewText(R.id.rain_detail, "${format(rain24)} mm")
+            views.setTextViewText(R.id.wind_detail, "${format(maxGust24)} km/h")
+            views.setTextViewText(R.id.temp_detail, if (maxTemp24.isFinite() && minTemp24.isFinite()) "${format(minTemp24)}–${format(maxTemp24)}°" else "—")
             views.setTextViewText(R.id.weather, "Vent ${format(maxWind)} · Rafales ${format(maxGust)} km/h · Pluie ${format(maxRain)} %")
             listOf(R.id.night0, R.id.night1, R.id.night2, R.id.night3, R.id.night4).forEachIndexed { index, id ->
                 val min = perNight[index].minOrNull()
@@ -218,7 +232,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 views.setTextViewText(id, "$label\n${min?.let { format(it) + "°" } ?: "—"}")
                 views.setTextColor(id, if (min == null) Color.WHITE else if (min <= 5) Color.rgb(255,117,130) else if (min < 8) Color.rgb(255,205,114) else Color.WHITE)
             }
-            views.setInt(R.id.status, "setBackgroundColor", color)
+            views.setColorStateList(R.id.status, "setBackgroundTintList", ColorStateList.valueOf(color))
             views.setTextColor(R.id.status, Color.WHITE)
             views.setTextViewText(R.id.updated, "↻ " + java.time.ZonedDateTime.now(ZoneId.of("Europe/Paris")).format(DateTimeFormatter.ofPattern("HH:mm")))
         } catch (exception: Exception) {
@@ -233,7 +247,9 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.night3, "—\n—")
             views.setTextViewText(R.id.night4, "—\n—")
             views.setTextViewText(R.id.weather, "Météo indisponible")
-            views.setTextViewText(R.id.rain_detail, "Pluie : données indisponibles")
+            views.setTextViewText(R.id.rain_detail, "—")
+            views.setTextViewText(R.id.wind_detail, "—")
+            views.setTextViewText(R.id.temp_detail, "—")
             views.setTextViewText(R.id.updated, "Hors ligne")
             views.setTextViewText(R.id.timeline_label, "24 H · PRÉVISIONS INDISPONIBLES")
         }
