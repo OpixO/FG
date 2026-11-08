@@ -59,7 +59,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
         BoubouWidget.configureRefresh(context, views)
         try { BoubouPhoto.bitmap()?.let { views.setImageViewBitmap(R.id.plant, it) } } catch (_: Exception) {}
         try {
-            val endpoint = URL("https://api.open-meteo.com/v1/forecast?latitude=43.667&longitude=4.032&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,wind_gusts_10m&timezone=Europe%2FParis&forecast_days=5")
+            val endpoint = URL("https://api.open-meteo.com/v1/forecast?latitude=43.667&longitude=4.032&hourly=temperature_2m,apparent_temperature,precipitation_probability,wind_speed_10m,wind_gusts_10m,precipitation&timezone=Europe%2FParis&forecast_days=5")
             val connection = (endpoint.openConnection() as HttpURLConnection).apply { connectTimeout = 12000; readTimeout = 12000 }
             val body = try {
                 if (connection.responseCode != 200) error("HTTP ${connection.responseCode}")
@@ -72,6 +72,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             val rain = hourly.getJSONArray("precipitation_probability")
             val wind = hourly.getJSONArray("wind_speed_10m")
             val gusts = hourly.getJSONArray("wind_gusts_10m")
+            val precipitation = hourly.getJSONArray("precipitation")
             val now = LocalDateTime.now(ZoneId.of("Europe/Paris"))
             val nightStart = if (now.hour < 9) now.toLocalDate().minusDays(1).atTime(18, 0) else now.toLocalDate().atTime(18, 0)
             val nightEnd = nightStart.plusHours(15)
@@ -158,6 +159,39 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
                 low < 8 -> "Nuit fraîche : surveille l'exposition"
                 else -> "Conditions favorables : Boubou peut rester dehors"
             }
+            // Two-hour blocks, each colored for the worst condition in that interval.
+            val risk = IntArray(12)
+            for (i in 0 until times.length()) {
+                val hour = LocalDateTime.parse(times.getString(i))
+                val slot = (java.time.Duration.between(now, hour).toMinutes() / 120).toInt()
+                if (hour.isBefore(now) || slot !in 0..11 || temps.isNull(i)) continue
+                val t = temps.getDouble(i)
+                val g = if (gusts.isNull(i)) 0.0 else gusts.getDouble(i)
+                val mm = if (precipitation.isNull(i)) 0.0 else precipitation.getDouble(i)
+                val probability = if (rain.isNull(i)) 0.0 else rain.getDouble(i)
+                val level = when {
+                    t <= 5 || g >= 65 || mm >= 8 -> 2
+                    t < 8 || g >= 45 || mm >= 3 || (mm >= 1.5 && probability >= 70) -> 1
+                    else -> 0
+                }
+                risk[slot] = maxOf(risk[slot], level)
+            }
+            val riskIds = intArrayOf(R.id.hour0, R.id.hour1, R.id.hour2, R.id.hour3, R.id.hour4, R.id.hour5, R.id.hour6, R.id.hour7, R.id.hour8, R.id.hour9, R.id.hour10, R.id.hour11)
+            riskIds.forEachIndexed { index, id ->
+                views.setInt(id, "setBackgroundColor", when(risk[index]) {
+                    2 -> Color.rgb(226, 74, 88)
+                    1 -> Color.rgb(244, 170, 67)
+                    else -> Color.rgb(71, 201, 143)
+                })
+            }
+            val firstRisk = risk.indexOfFirst { it == 2 }
+            val firstCaution = risk.indexOfFirst { it == 1 }
+            val timelineMessage = when {
+                firstRisk >= 0 -> "À ABRITER vers " + now.plusHours((firstRisk * 2).toLong()).format(DateTimeFormatter.ofPattern("HH:mm"))
+                firstCaution >= 0 -> "À SURVEILLER vers " + now.plusHours((firstCaution * 2).toLong()).format(DateTimeFormatter.ofPattern("HH:mm"))
+                else -> "DEHORS · 24 H FAVORABLES"
+            }
+            views.setTextViewText(R.id.timeline_label, "24 H · " + timelineMessage)
             views.setTextViewText(R.id.advice, advice)
             views.setTextViewText(R.id.current, "Actuellement " + (currentTemp?.let { format(it) + " °C" } ?: "—"))
             val hourNow = now.hour
@@ -193,6 +227,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.night4, "—\n—")
             views.setTextViewText(R.id.weather, "Météo indisponible")
             views.setTextViewText(R.id.updated, "Hors ligne")
+            views.setTextViewText(R.id.timeline_label, "24 H · PRÉVISIONS INDISPONIBLES")
         }
         AppWidgetManager.getInstance(context).updateAppWidget(ComponentName(context, BoubouWidget::class.java), views)
         return Result.success()
