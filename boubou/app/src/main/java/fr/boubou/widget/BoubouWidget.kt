@@ -85,11 +85,17 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             var maxWind = 0.0
             var maxGust = 0.0
             var maxRain = 0.0
+            var rain24 = 0.0
+            var rainProb24 = 0.0
             var minFeels = Double.POSITIVE_INFINITY
             for (index in 0 until times.length()) {
                 if (temps.isNull(index)) continue
                 val hour = LocalDateTime.parse(times.getString(index))
                 if (currentTemp == null && !hour.isBefore(now)) currentTemp = temps.getDouble(index)
+                if (!hour.isBefore(now) && hour.isBefore(now.plusHours(24))) {
+                    if (!precipitation.isNull(index)) rain24 += precipitation.getDouble(index)
+                    if (!rain.isNull(index)) rainProb24 = maxOf(rainProb24, rain.getDouble(index))
+                }
                 if (hour.isBefore(now) || !hour.isBefore(horizon)) continue
                 val temp = temps.getDouble(index)
                 if (nextCold == null && temp <= 5) nextCold = hour
@@ -204,6 +210,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setInt(R.id.root, "setBackgroundColor", background)
             views.setTextViewText(R.id.status, status)
             views.setTextViewText(R.id.temperature, "${format(low)} °C")
+            views.setTextViewText(R.id.rain_detail, "🌧 Pluie 24 h : ${format(rain24)} mm · Risque max ${format(rainProb24)} %")
             views.setTextViewText(R.id.weather, "Vent ${format(maxWind)} · Rafales ${format(maxGust)} km/h · Pluie ${format(maxRain)} %")
             listOf(R.id.night0, R.id.night1, R.id.night2, R.id.night3, R.id.night4).forEachIndexed { index, id ->
                 val min = perNight[index].minOrNull()
@@ -226,6 +233,7 @@ class WeatherWorker(context: Context, params: WorkerParameters) : Worker(context
             views.setTextViewText(R.id.night3, "—\n—")
             views.setTextViewText(R.id.night4, "—\n—")
             views.setTextViewText(R.id.weather, "Météo indisponible")
+            views.setTextViewText(R.id.rain_detail, "Pluie : données indisponibles")
             views.setTextViewText(R.id.updated, "Hors ligne")
             views.setTextViewText(R.id.timeline_label, "24 H · PRÉVISIONS INDISPONIBLES")
         }
